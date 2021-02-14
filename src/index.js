@@ -1,14 +1,38 @@
-var restify = require('restify');
+const restify = require('restify'); //loads restify
+const mongoose = require('mongoose'); //loads mongoose
+const rjwt = require('restify-jwt-community'); //loads
+const server = restify.createServer();
+import dotenv from 'dotenv';
+dotenv.config();
+//Middleware
+server.use(restify.plugins.bodyParser());
 
-function respond(req, res, next) {
-  res.send('hello ' + req.params.name);
-  next();
-}
+//Protected Routes
+server.use(
+    rjwt({ secret: process.env.JWT_SECRET }).unless({
+        path: [
+            '/api/auth',
+            '/auth/register',
+            '/api/debtors/',
+            '/api/debtors:id'
+        ]
+    })
+);
+server.listen(process.env.PORT, () => {
+    mongoose.set('useFindAndModify', false);
+    mongoose.connect(process.env.MONGODB_URI, {
+        useNewUrlParser: true,
+        useUnifiedTopology: true
+    });
+});
 
-var server = restify.createServer();
-server.get('/hello/:name', respond);
-server.head('/hello/:name', respond);
+const database = mongoose.connection;
+database.on('error', (err) => {
+    console.log(err);
+});
 
-server.listen(5000, function () {
-  console.log('%s listening at %s', server.name, server.url);
+database.once('open', () => {
+    require('./routes/debtors')(server);
+    require('./routes/users')(server);
+    console.log(`Server running on Port: ${process.env.PORT}`);
 });
